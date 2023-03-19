@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+
+db.sqlite3
+.DS_Store
+
+api key/
+
+media/
+
+handsfree-translator/
+
+migrations/
