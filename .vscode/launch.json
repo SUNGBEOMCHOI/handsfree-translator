@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "handsfree_translator",
+            "cwd": "frontend\\handsfree_translator",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "handsfree_translator (profile mode)",
+            "cwd": "frontend\\handsfree_translator",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "handsfree_translator (release mode)",
+            "cwd": "frontend\\handsfree_translator",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}
