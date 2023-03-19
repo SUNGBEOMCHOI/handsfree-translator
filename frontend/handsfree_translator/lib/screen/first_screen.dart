@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:handsfree_translator/screen/main_screen.dart';
 
 class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
@@ -11,15 +10,15 @@ class FirstScreen extends StatefulWidget {
 class _FirstScreenState extends State<FirstScreen> {
   @override
   void initState() {
-    super.initState();
-    Future.delayed(const Duration(milliseconds: 3000), () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => (const MainScreen()),
-        ),
-      );
-    });
+    // super.initState();
+    // Future.delayed(const Duration(milliseconds: 3000), () {
+    //   Navigator.push(
+    //     context,
+    //     MaterialPageRoute(
+    //       builder: (context) => (BluetoothConnectScreen()),
+    //     ),
+    //   );
+    // });
   }
 
   @override

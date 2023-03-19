@@ -1,43 +1,73 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:handsfree_translator/screen/first_screen.dart';
+import 'package:flutter_blue/flutter_blue.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final FlutterBlue flutterBlue = FlutterBlue.instance;
+
+  Future<void> askForPermissions() async {
+    final status = await Permission.bluetooth.request();
+
+    if (status.isGranted) {
+      await Permission.location.request();
+    } else {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: const Text('Bluetooth permission not granted'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  void scanForDevices() async {
+    await askForPermissions();
+
+    await flutterBlue.startScan(timeout: const Duration(seconds: 4));
+
+    flutterBlue.scanResults.listen((List<ScanResult> results) {
+      for (ScanResult result in results) {
+        print('${result.device.name} found! rssi: ${result.rssi}');
+      }
+    });
+
+    flutterBlue.stopScan();
+  }
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     return MaterialApp(
-        home: const FirstScreen(),
-        theme: ThemeData(
-          backgroundColor: const Color(0xff7E81EB),
-          primaryColorDark: const Color(0xff444444),
-          primaryColorLight: const Color(0xffffffff),
-          textTheme: const TextTheme(
-            subtitle1: TextStyle(
-              fontSize: 24.0,
-              fontWeight: FontWeight.bold,
-              color: Color(0xff444444),
-            ),
-            subtitle2: TextStyle(
-              fontSize: 24.0,
-              fontWeight: FontWeight.bold,
-              color: Color(0xffffffff),
-            ),
-            bodyText1: TextStyle(
-              fontSize: 24.0,
-              color: Color(0xff444444),
-            ),
-            bodyText2: TextStyle(
-              fontSize: 24.0,
-              color: Color(0xffffffff),
-            ),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Bluetooth Scan Example'),
+        ),
+        body: Center(
+          child: ElevatedButton(
+            onPressed: scanForDevices,
+            child: const Text('Scan for Devices'),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }
