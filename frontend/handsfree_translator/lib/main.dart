@@ -1,20 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:handsfree_translator/screen/main_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
-  final title = 'Flutter BLE Scan Demo';
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     return MaterialApp(
-      title: title,
-      home: MyHomePage(title: title),
-    );
+        home: const MainScreen(),
+        theme: ThemeData(
+          backgroundColor: const Color(0xff7E81EB),
+          primaryColorDark: const Color(0xff444444),
+          primaryColorLight: const Color(0xffffffff),
+          textTheme: const TextTheme(
+            subtitle1: TextStyle(
+              fontSize: 24.0,
+              fontWeight: FontWeight.bold,
+              color: Color(0xff444444),
+            ),
+            subtitle2: TextStyle(
+              fontSize: 24.0,
+              fontWeight: FontWeight.bold,
+              color: Color(0xffffffff),
+            ),
+            bodyText1: TextStyle(
+              fontSize: 24.0,
+              color: Color(0xff444444),
+            ),
+            bodyText2: TextStyle(
+              fontSize: 24.0,
+              color: Color(0xffffffff),
+            ),
+          ),
+        ));
   }
 }
 

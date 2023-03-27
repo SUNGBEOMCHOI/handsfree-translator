@@ -7,7 +7,8 @@ import openai
 from google.cloud import texttospeech
 
 # Get API Keys
-api_path = '../../api key/'
+base_dir = '/home/choisb3631/handsfree-translator/backend/handsfree_translator'
+api_path = f'{base_dir}/../../api key'
 
 
 class OpenAI:
@@ -19,7 +20,7 @@ class OpenAI:
 
         openai.organization = OPENAI_ORGANIZATION
         openai.api_key = OPENAI_API_KEY
-         
+
     def transcribe(self, audio_path, language):
         """
         Speech recognition audio file of 'source language' to text of 'source language'
@@ -34,7 +35,7 @@ class OpenAI:
         with open(audio_path, "rb") as audio_file:
             text_transcript = openai.Audio.transcribe("whisper-1", audio_file, language=language)
             return text_transcript.text
-        
+
     def translate(self, audio_path):
         """
         Translate source language audio file to english
@@ -48,7 +49,7 @@ class OpenAI:
         with open(audio_path, "rb") as audio_file:
             text_transcript = openai.Audio.translate("whisper-1", audio_file)
             return text_transcript.text
-        
+
 class Papago:
     def __init__(self):
         naver_api_path = os.path.join(api_path, 'naver.txt')
@@ -80,7 +81,7 @@ class Papago:
             return translate_result
         else:
             print("Papago Error Code:" + rescode)
-            
+
 class Google:
     def __init__(self):
         google_api_path = os.path.join(api_path, 'google.txt')
@@ -130,12 +131,12 @@ class Translator:
         self.openai = OpenAI()
         self.papago = Papago()
         self.google = Google()
-        self.audio_dir_path = './media/audio_files'
+        self.audio_dir_path = f'{base_dir}/media/audio_files'
 
     def translate(self, data):
         """
         Translate input source language audio files into target language audio files and text
-        
+
         Args:
             data: HTTP request which contains 'audio file name', 'audio file', 'request type'
             request type is one of [ko2en, en2ko]
@@ -156,22 +157,26 @@ class Translator:
         src_language, trg_language = request_type.split('2')
         if request_type == 'ko2en':
             ko_audio_path = audio_path
-            en_text = self.openai.translate(ko_audio_path)
-            output_text = en_text
-            output_audio_path = self.google.tts(output_text, trg_language, output_audio_path)
+            ko_text = self.openai.transcribe(ko_audio_path, src_language)
+            en_text = self.papago.translate(ko_text, src_language, trg_language)
+            transcribed_text = ko_text
+            translated_text = en_text
+            output_audio_path = self.google.tts(translated_text, trg_language, output_audio_path)
         elif request_type == 'en2ko':
             en_audio_path = audio_path
             en_text = self.openai.transcribe(en_audio_path, src_language)
             ko_text = self.papago.translate(en_text, src_language, trg_language)
-            output_text = ko_text
-            output_audio_path = self.google.tts(output_text, trg_language, output_audio_path)
+            transcribed_text = en_text
+            translated_text = ko_text
+            output_audio_path = self.google.tts(translated_text, trg_language, output_audio_path)
         else:
             raise NotImplementedError
-        
+
         content_type = 'audio/mpeg'
         response = FileResponse(open(output_audio_path, 'rb'), content_type=content_type)
-        response['audio_file_name'] = new_base_name
-        response['translated_text'] = output_text
+        response['uploaded_audio_file_name'] = audio_file_name
+        response['translated_audio_file_name'] = new_base_name
+        response['transcribed_text'] = transcribed_text
+        response['translated_text'] = translated_text
         response['request_type'] = request_type
         return response
-        

@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:handsfree_translator/model/audio.dart';
+import 'package:handsfree_translator/widget/file_name.dart';
+import 'package:handsfree_translator/widget/record_indicator.dart';
+import 'package:handsfree_translator/widget/send_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -20,8 +24,8 @@ class _MainScreenState extends State<MainScreen> {
   double scaleFactorUser2 = 1.0;
   double? fontsizeUser1;
   double? fontsizeUser2;
-  String textUser1 = "안녕\n안녕하세요\n안녕하세요";
-  String textUser2 = "Hello\nHello\nHello\nHello";
+  String textUser1 = "녹음 버튼을 눌러 번역을 시작하세요";
+  String textUser2 = "Press the record button to start translating";
   String langUser1 = "한국어";
   String langUser2 = "English";
 
@@ -34,8 +38,16 @@ class _MainScreenState extends State<MainScreen> {
   final bool _recorderUser1IsRecord = false;
   final bool _recorderUser2IsRecord = false;
   late Directory appDirectory;
-  String audioFilePathUser1 = "example_user1";
-  String audioFilePathUser2 = "example_user2";
+
+  final audioRecordBaseFilePathUser1 = "record_user1.wav";
+  final audioRecordBaseFilePathUser2 = "record_user2.wav";
+  String audioRecordFilePathUser1 = "";
+  String audioRecordFilePathUser2 = "";
+  String? audioPlayFilePathUser1 = "";
+  String? audioPlayFilePathUser2 = "";
+
+  ApiResponse? apiResponseUser1;
+  ApiResponse? apiResponseUser2;
 
   @override
   void initState() {
@@ -45,6 +57,9 @@ class _MainScreenState extends State<MainScreen> {
     _playerUser2.openPlayer();
     _recorderUser1.openRecorder();
     _recorderUser2.openRecorder();
+
+    fileCheck(audioRecordFilePathUser1);
+    fileCheck(audioRecordFilePathUser2);
   }
 
   @override
@@ -56,7 +71,7 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  void _getDir() async {
+  Future<void> _getDir() async {
     appDirectory = await getApplicationDocumentsDirectory();
   }
 
@@ -143,6 +158,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showDialog(BuildContext context, String usertype) {
+    ValueNotifier<bool> isProcessing = ValueNotifier<bool>(false);
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -150,11 +167,16 @@ class _MainScreenState extends State<MainScreen> {
         return Transform.rotate(
           angle: usertype == 'user1' ? 0 : math.pi,
           child: AlertDialog(
-            title: const Text(
-              "녹음중입니다...",
-              textAlign: TextAlign.center,
+            title: ValueListenableBuilder<bool>(
+              valueListenable: isProcessing,
+              builder: (context, value, child) {
+                return Text(
+                  value ? "번역중 입니다..." : "녹음중 입니다...",
+                  textAlign: TextAlign.center,
+                );
+              },
             ),
-            content: const RecordingIndicator(),
+            content: RecordingIndicator(isProcessing: isProcessing),
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
@@ -181,11 +203,46 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 onPressed: () async {
-                  usertype == "user1"
-                      ? await stopRecording(_recorderUser1, audioFilePathUser1,
-                          _recorderUser1IsRecord)
-                      : await stopRecording(_recorderUser2, audioFilePathUser2,
-                          _recorderUser2IsRecord);
+                  setState(() {
+                    isProcessing.value = true;
+                  });
+
+                  if (usertype == "user1") {
+                    await stopRecording(_recorderUser1,
+                        audioRecordFilePathUser1, _recorderUser1IsRecord);
+                    apiResponseUser1 = await uploadAudioFile(
+                        "${appDirectory.path}/$audioRecordFilePathUser1",
+                        'ko2en');
+
+                    if (mounted) {
+                      setState(() {
+                        audioPlayFilePathUser1 =
+                            apiResponseUser1?.uploadedAudioFileName ?? '';
+                        audioPlayFilePathUser2 =
+                            apiResponseUser1?.translatedAudioFileName ?? '';
+                        textUser1 = apiResponseUser1?.transcribedText ?? '';
+                        textUser2 = apiResponseUser1?.translatedText ?? '';
+                      });
+                    }
+                  } else {
+                    await stopRecording(_recorderUser2,
+                        audioRecordFilePathUser2, _recorderUser2IsRecord);
+                    apiResponseUser2 = await uploadAudioFile(
+                        "${appDirectory.path}/$audioRecordFilePathUser2",
+                        'en2ko');
+
+                    if (mounted) {
+                      setState(() {
+                        audioPlayFilePathUser2 =
+                            apiResponseUser2?.uploadedAudioFileName ?? '';
+                        audioPlayFilePathUser1 =
+                            apiResponseUser2?.translatedAudioFileName ?? '';
+                        textUser2 = apiResponseUser2?.transcribedText ?? '';
+                        textUser1 = apiResponseUser2?.translatedText ?? '';
+                      });
+                    }
+                  }
+                  isProcessing.value = false;
                   Navigator.of(context).pop();
                 },
               ),
@@ -194,6 +251,16 @@ class _MainScreenState extends State<MainScreen> {
         );
       },
     );
+  }
+
+  Future<void> fileCheck(String audioFilePath) async {
+    await _getDir();
+    final file = File('${appDirectory.path}/$audioFilePath');
+    print('${appDirectory.path}/$audioFilePath');
+    if (await file.exists()) {
+      await file.delete();
+      print('delete');
+    }
   }
 
   Container midTab(BuildContext context, String usertype) {
@@ -285,8 +352,8 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () async {
                       await requestPermission();
                       usertype == 'user1'
-                          ? play(_playerUser1, audioFilePathUser1)
-                          : play(_playerUser2, audioFilePathUser2);
+                          ? play(_playerUser1, audioPlayFilePathUser1)
+                          : play(_playerUser2, audioPlayFilePathUser2);
                     },
                     color: usertype == 'user1'
                         ? Theme.of(context).primaryColorDark
@@ -307,11 +374,19 @@ class _MainScreenState extends State<MainScreen> {
                       await _requestMicrophonePermission();
                       await requestPermission();
                       // mPlayerIsRecord ? stopRecording() : startRecording();
-                      usertype == 'user1'
-                          ? startRecording(_recorderUser1, audioFilePathUser1,
-                              _recorderUser1IsRecord)
-                          : startRecording(_recorderUser2, audioFilePathUser2,
-                              _recorderUser2IsRecord);
+                      if (usertype == 'user1') {
+                        audioRecordFilePathUser1 =
+                            generateFilenameWithTimestamp(
+                                audioRecordBaseFilePathUser1);
+                        startRecording(_recorderUser1, audioRecordFilePathUser1,
+                            _recorderUser1IsRecord);
+                      } else {
+                        audioRecordFilePathUser2 =
+                            generateFilenameWithTimestamp(
+                                audioRecordBaseFilePathUser2);
+                        startRecording(_recorderUser2, audioRecordFilePathUser2,
+                            _recorderUser2IsRecord);
+                      }
                       _showDialog(context, usertype);
                     },
                     color: usertype == 'user1'
@@ -336,118 +411,4 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-}
-
-class RecordingIndicator extends StatefulWidget {
-  final double size;
-
-  const RecordingIndicator({this.size = 200.0});
-
-  @override
-  _RecordingIndicatorState createState() => _RecordingIndicatorState();
-}
-
-class _RecordingIndicatorState extends State<RecordingIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _waveAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat();
-
-    _waveAnimation = Tween<double>(
-      begin: 0.0,
-      end: 2.0 * math.pi,
-    ).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border:
-            Border.all(width: 2.0, color: Theme.of(context).primaryColorDark),
-      ),
-      child: Stack(
-        children: [
-          Center(
-            child: Icon(
-              Icons.mic,
-              size: widget.size * 0.6,
-              color: Theme.of(context).primaryColorDark,
-            ),
-          ),
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return ClipPath(
-                clipper: WaveClipper(_waveAnimation.value),
-                child: Center(
-                  child: Container(
-                    width: widget.size,
-                    height: widget.size,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color:
-                          Theme.of(context).primaryColorDark.withOpacity(0.4),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class WaveClipper extends CustomClipper<Path> {
-  final double wavePhase;
-
-  WaveClipper(this.wavePhase);
-
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-
-    final amplitude = size.width / 20;
-    final wavelength = size.width / 2;
-
-    final originY = size.height / 2;
-    final originX = size.width / 2 - wavelength;
-
-    path.moveTo(originX, originY);
-
-    for (double x = originX; x < size.width; x++) {
-      final y = amplitude *
-              math.sin((x - originX) * 2 * math.pi / wavelength + wavePhase) +
-          originY;
-      path.lineTo(x, y);
-    }
-
-    path.lineTo(size.width, size.height);
-    path.lineTo(originX, size.height);
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(WaveClipper oldClipper) => true;
 }
